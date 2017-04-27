@@ -1,19 +1,23 @@
 import torch
 import torch.nn as nn
+import torch.legacy
 
+# cannot figure out number of filters
 class AlexNet(nn.Module):
     def __init__(self, num_classes=10):
         super(AlexNet, self).__init__()
         self.features = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=5),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3), # TODO: local response
+            nn.MaxPool2d(kernel_size=3),
+            torch.legacy.SpatialCrossMapLRN(5, alpha=1, beta=0.5),
             nn.Conv2d(64, 192, kernel_size=5),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3) # TODO: local response
+            nn.MaxPool2d(kernel_size=3),
+            torch.legacy.SpatialCrossMapLRN(5, alpha=1, beta=0.5)
         )
         self.classifier = nn.Sequential(
-            nn.Linear(256 * 6 * 6, 384),
+            nn.Linear(192 * 16 * 16, 384),
             nn.ReLU(inplace=True),
             nn.Linear(384, 192),
             nn.ReLU(inplace=True),
