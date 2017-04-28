@@ -26,7 +26,7 @@ parser.add_argument('--arch', '-a', metavar='ARCH', default='mlp',
                     help='model architecture')
 # parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
                     # help='number of data loading workers')
-parser.add_argument('-b', '--batch-size', default=256, type=int,
+parser.add_argument('-b', '--batch-size', default=512, type=int,
                     metavar='N', help='mini-batch size')
 parser.add_argument('--print-freq', '-p', default=100, type=int,
                     metavar='N', help='print frequency (default: 10)')
@@ -36,8 +36,13 @@ parser.add_argument('--num-plots', default=5, type=int,
                     help='number of data points to plot')
 parser.add_argument('--fig-names', required=True, type=str, help='fig names')
 
-torch.manual_seed(3435)
-torch.cuda.manual_seed(3435)
+parser.add_argument('--eps', type=float, default=.25,
+                    help='eps of gradient, chosen uniformly')
+parser.add_argument('--step', type=float, default=.1,
+                    help='step size for figures')
+parser.add_argument('--fig-size', type=float, default=20,
+                    help='max perturbation in positive and negative directions')
+parser.add_argument('--seed', type=int, default=3435, help='random seed')
 
 def load_model(model_path, model):
     assert os.path.isfile(model_path), 'no file found at {}'.format(model_path)
@@ -52,6 +57,8 @@ models = {'alexnet': AlexNet, 'mlp': MLP, 'inception': Inception}
 def main():
     global args
     args = parser.parse_args()
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
 
     # create model
     print("=> creating model '{}'".format(args.arch))
@@ -81,21 +88,25 @@ def main():
         batch_size=1, shuffle=False,
         num_workers=0, pin_memory=True)
 
+    model.eval()
+    dir1, dir2 = get_directions(torch.Size((1, 3, 28, 28)), args.eps)
     for i, (input, target) in enumerate(train_loader):
         if i >= args.num_plots: break
-        filename = '{}_{}.png'.format(args.fig_names, i)
-        plot_curvature(input, model, filename)
+        filename = '{}_eps{:.2f}_size{}_step{}_{}.png'.format(
+                args.fig_names,
+                args.eps,
+                int(args.fig_size),
+                args.step,
+                i)
+        plot_curvature(input, model, filename, dir1, dir2, size=args.fig_size, step=args.step)
 
-def plot_curvature(input, model, filename, size=20, step=0.1, num_classes=10):
-    # TODO take random directions
-    dir1, dir2 = get_directions(input.size())
-
-    xx, yy = np.meshgrid(np.arange(-size, size+1, step), np.arange(-size, size+1, step))
+def plot_curvature(input, model, filename, dir1, dir2, size=20, step=0.1):
+    xx, yy = np.meshgrid(np.arange(-size, size, step), np.arange(-size, size, step))
     xx_flat, yy_flat = xx.flatten(), yy.flatten()
     all_input = input.repeat(xx_flat.shape[0], 1, 1, 1)
     for i in range(len(xx_flat)):
         x,y = xx_flat[i], yy_flat[i]
-        all_input[i] += dir1 * x + dir2 * y
+        all_input[i].add_(dir1 * x).add_(dir2 * y)
 
     all_preds = torch.LongTensor(all_input.size(0), 1)
     for i in range(0, all_input.size(0), args.batch_size):
@@ -107,10 +118,11 @@ def plot_curvature(input, model, filename, size=20, step=0.1, num_classes=10):
     all_preds = all_preds.numpy().reshape((xx.shape[0], xx.shape[1]))
 
     plt.figure()
+    plt.axis('equal')
     plt.pcolormesh(xx, yy, all_preds) # colors?
     plt.savefig(filename)
 
-def get_directions(size, eps=1.):
+def get_directions(size, eps):
     # Return random noise for now
     dir1 = torch.Tensor(size).uniform_(-eps, eps)
     dir2 = torch.Tensor(size).uniform_(-eps, eps)
