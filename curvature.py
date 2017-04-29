@@ -90,9 +90,22 @@ def main():
 
     model.eval()
     dir1, dir2 = get_directions(torch.Size((1, 3, 28, 28)), args.eps)
+
+    print('plotting for train...')
     for i, (input, target) in enumerate(train_loader):
         if i >= args.num_plots: break
-        filename = '{}_eps{:.2f}_size{}_step{}_{}.png'.format(
+        filename = '{}_train_eps{:.2f}_size{}_step{}_{}.png'.format(
+                args.fig_names,
+                args.eps,
+                int(args.fig_size),
+                args.step,
+                i)
+        plot_curvature(input, model, filename, dir1, dir2, size=args.fig_size, step=args.step)
+
+    print('plotting for val...')
+    for i, (input, target) in enumerate(val_loader):
+        if i >= args.num_plots: break
+        filename = '{}_val_eps{:.2f}_size{}_step{}_{}.png'.format(
                 args.fig_names,
                 args.eps,
                 int(args.fig_size),
@@ -110,7 +123,7 @@ def plot_curvature(input, model, filename, dir1, dir2, size=20, step=0.1):
 
     all_preds = torch.LongTensor(all_input.size(0), 1)
     for i in range(0, all_input.size(0), args.batch_size):
-        input_var = Variable(all_input[i:i + args.batch_size].cuda())
+        input_var = Variable(all_input[i:i + args.batch_size].cuda(), volatile=True)
         labels = model(input_var)
         _, preds = torch.max(labels.data, 1)
         all_preds[i:i + args.batch_size].copy_(preds)
