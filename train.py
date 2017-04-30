@@ -4,7 +4,6 @@ import shutil
 import time
 
 from models import AlexNet, MLP, Inception
-from transforms import per_image_whiten, random_labels
 from util import *
 
 import torch

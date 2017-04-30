@@ -9,13 +9,11 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
 from models import AlexNet, MLP, Inception
-from transforms import per_image_whiten
 from util import *
 
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
-import torch.optim
 import torch.utils.data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
@@ -44,14 +42,6 @@ parser.add_argument('--fig-size', type=float, default=20,
                     help='max perturbation in positive and negative directions')
 parser.add_argument('--seed', type=int, default=3435, help='random seed')
 
-def load_model(model_path, model):
-    assert os.path.isfile(model_path), 'no file found at {}'.format(model_path)
-    print("=> loading model '{}'".format(model_path))
-    checkpoint = torch.load(model_path)
-    model.load_state_dict(checkpoint['state_dict'])
-    print("=> loaded checkpoint '{}' (epoch {})"
-          .format(model_path, checkpoint['epoch']))
-
 models = {'alexnet': AlexNet, 'mlp': MLP, 'inception': Inception}
 
 def main():
@@ -67,26 +57,7 @@ def main():
     load_model(args.model_path, model)
 
     # load data
-    normalize = transforms.Lambda(per_image_whiten)
-    train_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10('data/', train=True, download=True,
-                        transform=transforms.Compose([
-                            transforms.CenterCrop(28),
-                            transforms.ToTensor(),
-                            normalize,
-                        ])),
-        batch_size=1, shuffle=False,
-        num_workers=0, pin_memory=True)
-
-    val_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10('data/', train=False, download=True,
-                        transform=transforms.Compose([
-                            transforms.CenterCrop(28),
-                            transforms.ToTensor(),
-                            normalize,
-                        ])),
-        batch_size=1, shuffle=False,
-        num_workers=0, pin_memory=True)
+    train_loader, val_loader = load_datasets()
 
     model.eval()
     dir1, dir2 = get_directions(torch.Size((1, 3, 28, 28)), args.eps)
